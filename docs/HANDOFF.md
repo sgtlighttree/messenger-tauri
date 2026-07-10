@@ -92,12 +92,15 @@ market unverified ones.
 
 ## Repo state at handoff
 
-- Branch `feat/rebuild-v1` off `main`. Commits so far: CLAUDE.md; the Tauri-era spec (later
-  superseded); the Electron spec; (this commit) the MVP plan + this handoff.
-- The Tauri code (`src-tauri/`, `src/` scaffold, `metadata.json`, mobile icons) still exists on disk
-  — plan Task 1 removes it.
+- Branch `feat/rebuild-v1` off `main`. Commits: CLAUDE.md; the Tauri-era spec (superseded); the
+  Electron spec; the MVP plan + this handoff; **then the full MVP implementation (2026-07-11,
+  subagent-driven): Tauri removed, Electron 43 scaffold, hardened window (sandbox:true, bundled
+  preload), links/downloads, unread dock badge, calls/screen-share permission handlers,
+  CALLS-RESULT.md template, CI workflow, packaged arm64 dmg (release/), README+CLAUDE.md rewritten.**
+- All automated checks green (11/11 unit tests, build, packaging). Every login-dependent check is
+  batched in `docs/MANUAL-TESTS.md` — **none run yet**, including the calls gate.
 - GitHub remote: `github.com/sgtlighttree/messenger-tauri` (rename to `mercury-mac` deferred to plan
-  Task 12).
+  Task 12; branch not yet pushed).
 
 ## Rename runbook (deferred — plan Task 12, run at a session boundary)
 
