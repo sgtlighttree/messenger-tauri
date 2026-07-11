@@ -89,3 +89,18 @@ becomes "<name> is calling" → attempt 3 is title-based. Remaining checks:
       "Incoming call" — an unexpected string is the likely cause).
 - [ ] **Calls regression check**: one outgoing voice call still connects, and the call window
       appears promptly (a call window failing to appear within ~5s is a regression — report it).
+
+## 10. Right-click context menu (2026-07-12)
+
+Link/edit/selection/Look Up behavior was verified agent-side with a real-Electron input-event
+harness (menu built correctly, handlers fired). ONE check needs a human, because synthetic key
+events don't drive macOS's native spellchecker:
+
+- [ ] **Spelling suggestions**: type a misspelled word (e.g. "helo") in a chat input → red
+      squiggle appears → right-click it → correction suggestions + "Add to Dictionary" at the
+      top of the menu. If NO squiggle ever appears, note it — first suspect is the native
+      spellchecker needing the signed/packaged app (same class of issue as notifications
+      registration); the menu code itself is fine either way.
+- [ ] Quick spot-checks while you're there: right-click a link → "Open Link in Browser" /
+      "Copy Link Address"; right-click a photo → "Copy Image" / "Save Image to Downloads";
+      right-click selected text → "Look Up".

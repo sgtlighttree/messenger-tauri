@@ -58,6 +58,10 @@ footprint live in `ARCHITECTURE.md`; this map covers the source files.
   permission handler that grants only `media`/`display-capture` and denies everything else, and a
   `setDisplayMediaRequestHandler` for screen-share), and listens for the unread-count IPC message
   to set the dock badge (`app.setBadgeCount`).
+- **`src/main/context-menu.ts`** — pure, unit-tested right-click menu template builder
+  (spelling suggestions, Look Up, cut/copy/paste, link/image actions) with injected actions —
+  no Electron imports; `attachContextMenu` in `index.ts` maps the actions onto
+  webContents/clipboard/shell and pops the real Menu.
 - **`src/main/splash.ts`** — a small frameless, theme-aware (`prefers-color-scheme`) splash
   window built from an inline data-URL page (no static assets to package); shown while the main
   window loads messenger.com hidden, then destroyed on reveal (`did-finish-load` / 15s cap).
