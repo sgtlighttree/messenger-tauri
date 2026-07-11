@@ -53,6 +53,7 @@ Fill **docs/CALLS-RESULT.md** as you go; it is the spec's M3 evidence file.
 - [ ] 1:1 **video call**: camera prompt → allow → two-way video.
 - [ ] In-call **screen share** (best-effort): macOS Screen Recording permission may require an
       app restart after granting (System Settings → Privacy & Security → Screen Recording).
+- [ ] If a call button produces NO permission prompt at all, note it explicitly — permission-check wiring (setPermissionCheckHandler) is the first suspect.
 - [ ] Record the verdict line (PASSED / FAILED / PARTIAL). A failure here is a real result,
       not a setback to hide — it decides what we do next.
 
