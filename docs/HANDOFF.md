@@ -117,6 +117,20 @@ cd ~/mercury-mac && claude --resume                           # verify this conv
 
 If `--resume` doesn't show this conversation, this HANDOFF.md is the fallback context.
 
+## Known follow-ups (non-blocking, triaged by the final branch review 2026-07-11)
+
+All fail safe, are unreachable in practice, or are cosmetic. None block merge; groom opportunistically:
+
+1. Trailing-dot hostname (`facebook.com.`) classified external — fails safe (opens in browser).
+2. Tab/newline-in-scheme URLs dropped rather than opened — fails safe.
+3. `Infinity` would pass the badge-count guard — unreachable (only our preload sends, regex can't emit it).
+4. No debounce on the title MutationObserver — cheap idempotent IPC.
+5. CI pins Node 20 vs local Node 24 — bump when convenient.
+6. esbuild `^0.24` pin is oldish — bump opportunistically.
+7. Downloads overwrite silently on duplicate filenames — add a counter suffix if path exists.
+8. `will-redirect` not intercepted (server-side 3xx to a non-allowlisted host would load in-window;
+   low risk since Meta auth redirects stay in-allowlist) — add a handler reusing `isExternalUrl`.
+
 ## Open questions to resolve during/after build
 
 1. **Calls on our Electron build** — the Task 7 gate. Root cause of incumbents' broken calls is
