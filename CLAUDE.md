@@ -21,11 +21,19 @@ manual test pass fills it in.
 ## Common commands
 
 ```bash
-npm install       # install JS deps
-npm start         # npm run build && electron .  — launch the app locally
-npm test          # vitest run — unit tests for src/main/links.ts and src/preload/unread.ts
-npm run dist      # npm run build && electron-builder --mac — produce the arm64 .dmg in release/
+npm install                        # install JS deps
+npm start                          # npm run build && electron .  — launch the app locally
+npm test                           # vitest run — unit tests for the pure logic in src/
+CSC_NAME="Mercury Dev" npm run dist  # signed arm64 .dmg in release/ — CSC_NAME is REQUIRED
+                                   # (ad-hoc builds can't register notifications and reset
+                                   # TCC grants every rebuild; see docs/BUILD-NOTES.md)
 ```
+
+**Notifications are a known, evidence-backed limitation** — messenger.com posts them via Web
+Push, which Electron cannot receive (no push service). Do NOT re-attempt page-Notification
+interception without reading the "Notifications" section of `docs/HANDOFF.md` first; the
+existing preload shim + IPC bridge is the tested end state, and the owner chose badge+sound
+over synthetic banners.
 
 `npm run build` runs `tsc` (main + shared) and bundles the preload with esbuild into a single CJS
 file at `dist/preload/index.js` (required because the preload runs under Electron's `sandbox:

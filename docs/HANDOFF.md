@@ -5,6 +5,60 @@ continue from a fresh Claude Code session (or by another person) even if `claude
 to carry the conversation after the repo/folder rename. Read this top-to-bottom to reconstruct full
 context.
 
+## Notes for Matt
+
+**State (end of 2026-07-11 session):** MVP done and merged to `main`. Calls ✅ (voice+video,
+both directions, dev+packaged). Screen share ✅ (whole screen only). Badge ✅ (with anti-blink
+stabilizer). Session/2FA ✅. Window size persists ✅ (shared between `npm start` and the
+packaged app). Notifications ❌ — documented limitation, see the Notifications section below;
+badge+sound is the chosen behavior.
+
+**Build the real app** (signed — required, or notifications registration and TCC persistence
+break, and hardened runtime won't load):
+```bash
+CSC_NAME="Mercury Dev" npm run dist   # → release/Messenger-0.1.0-arm64.dmg
+```
+The "Mercury Dev" self-signed cert lives in your login keychain (trusted for code signing).
+Plain `npm run dist` without CSC_NAME produces an ad-hoc build that LAUNCHES but can't register
+for notifications and resets TCC grants every rebuild — don't use it.
+
+**The rename (run when NO Claude session is active in this folder):**
+```bash
+cd ~/messenger-tauri && gh repo rename mercury-mac --yes   # GitHub + remote + redirects
+cd ~ && mv messenger-tauri mercury-mac                     # local folder
+mv ~/.claude/projects/-Users-matthewoyan-messenger-tauri \
+   ~/.claude/projects/-Users-matthewoyan-mercury-mac       # Claude history + memory follow
+cd ~/mercury-mac && claude --resume                        # verify this conversation appears
+```
+If `--resume` doesn't show the conversation, this HANDOFF.md + the auto-loaded memory files
+carry everything. Package/crate identity inside the repo is already `mercury-mac`.
+
+**Where things live:** spec+plan `docs/superpowers/`; calls evidence `docs/CALLS-RESULT.md`;
+manual checklist `docs/MANUAL-TESTS.md`; build facts `docs/BUILD-NOTES.md`; follow-up list
+below (badge/notification enrichment, screen-share picker, will-redirect, etc.).
+
+## Notifications: documented limitation (2026-07-11, evidence-based)
+
+**messenger.com delivers desktop notifications exclusively via Web Push → service-worker
+`showNotification`. Electron has no push service** (`AbortError: Registration failed — push
+service not available`, electron#13041; Chrome ships Google's push backend, Electron doesn't),
+so the push never arrives and no notification can be surfaced. Verified empirically in three
+rounds: (1) OS layer proven working (signed app + main-process test notification appeared,
+app registered in System Settings); (2) page-`Notification` interception shim installed at
+dom-ready — nothing; (3) shim moved to preload/main-world (installs before any page script,
+eliminating the capture race) — still nothing while the in-page sound played and Vivaldi (real
+Chrome push) delivered the same message. Caprine has the same rot (multiple open "no
+notifications" issues 2024–2026; their interceptor is the same design). Push-emulation libs
+(electron-push-receiver et al) are FCM-project-scoped and cannot receive Facebook's encrypted
+push — dead end.
+
+**Owner's decision: accept badge + in-page sound; NO synthetic generic banner.** The dock badge
+has an anti-blink stabilizer (rises instant, zero only clears after ~2.5s stable) so a quick
+dock-peek is trustworthy. If richer notifications are ever wanted, the follow-up path is
+synthesizing from the unread-count rise + conversation-list DOM scrape (sender/preview) — the
+notification bridge (preload shim → IPC → native Notification, GC-hardened per electron#16922)
+is already in place and tested; only the trigger source is missing.
+
 ## TL;DR
 
 Reviving an abandoned Tauri prototype (a macOS wrapper for Facebook Messenger) into a serious,
