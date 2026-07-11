@@ -4,39 +4,86 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A Tauri v2 desktop wrapper for the Facebook Messenger web app, optimized for macOS. It is a thin native shell, not a reimplementation of Messenger.
+A lightweight-for-Electron macOS desktop wrapper for Facebook Messenger. It is a thin native
+shell, not a reimplementation of Messenger: the app window loads `https://www.messenger.com`
+directly, and essentially all product logic (chat, unread counts, calls) lives on the remote site,
+not in this repo.
 
-## Architecture
+Electron (Chromium), not Tauri/WebKit, was chosen for exactly one reason: Messenger's voice/video
+calls depend on a Chrome-only WebRTC API (`createEncodedStreams`) that WebKit does not implement.
+See `docs/HANDOFF.md` for the full research trail behind that decision.
 
-The single most important thing to understand: **the app window loads `https://www.messenger.com` directly.** The window's `url` is set to the remote site in `src-tauri/tauri.conf.json` (`app.windows[0].url`), along with a spoofed desktop Chrome `userAgent` for compatibility.
-
-Consequences:
-- **The `src/` frontend (`main.ts`, `index.html`, `styles.css`) is unused at runtime.** It is leftover Tauri scaffolding (the `greet` demo). Vite still builds it into `../dist` because `frontendDist` points there, but the window never navigates to it. Don't add product UI here expecting it to appear in the app.
-- Behavior/appearance changes for the actual app come from **native Tauri config** (`tauri.conf.json`, `capabilities/`, the Rust side in `src-tauri/src/lib.rs`) or from what messenger.com itself serves — not from `src/`.
-- The `greet` Tauri command (`src-tauri/src/lib.rs` ↔ `src/main.ts`) is demo boilerplate and can be removed if you build real native commands.
-
-Security is enforced via a strict CSP in `tauri.conf.json` (`app.security.csp`) that allowlists only Messenger/Facebook/fbcdn origins (including `wss://` for realtime). Native capabilities (notifications, opener) are granted in `src-tauri/capabilities/default.json`; a plugin used from Rust must also be registered in `lib.rs` **and** permitted there.
+**Calls-gate status: UNVERIFIED.** Camera/mic permission wiring, entitlements, and screen-share
+plumbing are implemented, but end-to-end calls have not been confirmed working in a real call.
+Don't claim calls work; check `docs/CALLS-RESULT.md` — it's PASSED/FAILED/PARTIAL only after a
+manual test pass fills it in.
 
 ## Common commands
 
 ```bash
-npm install              # install JS deps (also triggers Cargo build on first tauri run)
-npm run tauri dev        # run the app in debug mode with devtools
-npm run tauri build      # production .app / DMG for current arch
-npm run deploy           # scripts/deploy.sh: kill running instance, build, copy to /Applications
+npm install       # install JS deps
+npm start         # npm run build && electron .  — launch the app locally
+npm test          # vitest run — unit tests for src/main/links.ts and src/preload/unread.ts
+npm run dist      # npm run build && electron-builder --mac — produce the arm64 .dmg in release/
 ```
 
-Universal (Apple Silicon + Intel) build:
-```bash
-rustup target add aarch64-apple-darwin x86_64-apple-darwin
-npm run tauri build -- --target universal-apple-darwin
-```
-Bundles land in `src-tauri/target/<...>/release/bundle/`.
+`npm run build` runs `tsc` (main + shared) and bundles the preload with esbuild into a single CJS
+file at `dist/preload/index.js` (required because the preload runs under Electron's `sandbox:
+true`, which needs a bundled, dependency-free script).
 
-There is no test suite, linter, or formatter configured. `npm run build` (`tsc && vite build`) only type-checks/builds the unused `src/` scaffolding.
+## Architecture map
 
-## Gotchas
+- **`src/main/config.ts`** — the single source of truth for the wrapped URL: `TARGET_URL`
+  (`https://www.messenger.com`) and `ALLOWED_HOSTS` (hosts kept inside the app window: messenger.com,
+  facebook.com, fbcdn.net, fbsbx.com — everything else is treated as external). To point the app
+  at a different URL (e.g. if messenger.com is ever retired in favor of facebook.com/messages),
+  change `TARGET_URL` here — nowhere else.
+- **`src/main/links.ts`** — pure, unit-tested URL predicates (`isExternalUrl`, `isHttpUrl`) used to
+  decide whether a navigation/window-open should stay in the app or be handed to
+  `shell.openExternal`. No Electron imports; easy to test in isolation (see `tests/links.test.ts`).
+- **`src/main/index.ts`** — the app entrypoint: creates the `BrowserWindow` with the security
+  webPreferences (see Security invariants below), wires `setWindowOpenHandler` and `will-navigate`
+  to `links.ts`'s predicates, configures the default session (downloads to `~/Downloads`, a
+  permission handler that grants only `media`/`display-capture` and denies everything else, and a
+  `setDisplayMediaRequestHandler` for screen-share), and listens for the unread-count IPC message
+  to set the dock badge (`app.setBadgeCount`).
+- **`src/preload/`** — the sandboxed, esbuild-bundled preload. `unread.ts` is a pure function
+  (`parseUnreadCount`) that extracts the unread count from the page `<title>` (e.g. `"(3)
+  Messenger"` → `3`); `index.ts` wires it up via a `MutationObserver` on `<title>` and sends it to
+  the main process over IPC on change.
+- **`src/shared/channels.ts`** — the single place IPC channel name constants (`IPC.SET_UNREAD`)
+  are defined, shared between main and preload so the string literal only exists once.
 
-- Cargo dependencies in `src-tauri/Cargo.toml` are pinned to exact versions (`=2.2.1`, etc.). Prefer keeping them pinned; loosening them has caused version-mismatch build issues before.
-- Package names are still the scaffold defaults (`tauri-app`, crate `tauri_app_lib`) even though the product name is `Messenger` (set in `tauri.conf.json` / `deploy.sh`). The deploy script matches the process name `Messenger`.
-- Project is macOS-focused (iOS/Android icons exist but there is no mobile build flow documented here).
+## Security invariants — never weaken these
+
+The page is remote, untrusted content (messenger.com), so the app is deliberately locked down:
+
+- `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` on the `BrowserWindow`'s
+  `webPreferences` (`src/main/index.ts`). The preload must stay a single bundled file with no
+  Node/Electron internals leaking to the page — this is *why* it's esbuild-bundled rather than run
+  as raw TypeScript.
+- The session's permission handler (`ses.setPermissionRequestHandler`) grants only `media` (camera
+  /mic) and `display-capture` (screen share); every other permission request must be denied.
+  Don't broaden this without a specific reason.
+- External/non-allowlisted navigations are intercepted (`setWindowOpenHandler`, `will-navigate`)
+  and either handed to the system browser (http/https only) or dropped entirely (other schemes).
+  Don't let arbitrary URLs load inside the app window.
+- `build/entitlements.mac.plist` grants only camera, microphone, and JIT entitlements for the
+  packaged app — no broader sandbox exceptions.
+
+## Testing
+
+`npm test` runs `vitest` against `tests/links.test.ts` and `tests/unread.test.ts`, covering the
+pure predicate/parsing logic in `src/main/links.ts` and `src/preload/unread.ts`. There is
+currently no automated test for Electron wiring itself (window creation, IPC, permission
+handlers) — that's exercised manually.
+
+## Packaging
+
+`npm run dist` uses `electron-builder` (config in `package.json`'s `"build"` block) to produce an
+arm64-only, `en`-locale-only `.dmg` in `release/` (note: `directories.output` is set to `release`,
+*not* `dist`, because `dist` is also the TypeScript/esbuild build output directory — electron-builder's
+`files` glob would otherwise recursively bundle its own previous output into the asar). There is no
+Apple Developer ID signing identity on the build machine; electron-builder ad-hoc-signs instead,
+so first launch requires right-click → Open to get past Gatekeeper. Real measured `.app`/`.dmg`
+sizes and RAM are recorded in `docs/BUILD-NOTES.md` — don't invent footprint numbers.
