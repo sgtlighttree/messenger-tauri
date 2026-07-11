@@ -117,6 +117,19 @@ cd ~/mercury-mac && claude --resume                           # verify this conv
 
 If `--resume` doesn't show this conversation, this HANDOFF.md is the fallback context.
 
+## 🎉 CALLS GATE: PASSED (2026-07-11)
+
+Voice + video calls work **bidirectionally** (made and received) in both `npm start` and the
+packaged dmg. Screen share works (whole-screen only). Full evidence + the three stacked root
+causes (about:blank popup denial → web-perms fine → TCC launcher-identity) in
+`docs/CALLS-RESULT.md`. The project's differentiator — the thing Caprine/messenger-mac/goofy
+all fail at — is empirically real. Key fixes: 3275a01, c252dfc, cb602bd.
+
+Dev-run gotcha worth remembering: `npm start` inherits the **launcher's** TCC identity (VS Code
+/ Terminal), so mic grants go to that app; the packaged app has its own identity. A self-signed
+cert ("Mercury Dev", already created in Keychain) can be used via `CSC_NAME="Mercury Dev" npm run
+dist` for stable signatures so TCC grants survive rebuilds.
+
 ## Known follow-ups (non-blocking, triaged by the final branch review 2026-07-11)
 
 All fail safe, are unreachable in practice, or are cosmetic. None block merge; groom opportunistically:
@@ -130,6 +143,13 @@ All fail safe, are unreachable in practice, or are cosmetic. None block merge; g
 7. Downloads overwrite silently on duplicate filenames — add a counter suffix if path exists.
 8. `will-redirect` not intercepted (server-side 3xx to a non-allowlisted host would load in-window;
    low risk since Meta auth redirects stay in-allowlist) — add a handler reusing `isExternalUrl`.
+9. **Screen share has no source picker** — shares the entire primary screen immediately (MVP
+   choice). Chromium browsers offer tab/window/screen selection; Electron needs a small custom
+   picker UI over `desktopCapturer.getSources({types:["screen","window"]})`. Best UX follow-up.
+10. Sign builds with the "Mercury Dev" self-signed cert (`CSC_NAME="Mercury Dev" npm run dist`)
+    so the signature — and TCC permission grants — stay stable across rebuilds.
+11. README's "right-click → Open" note is slightly misleading: Gatekeeper only affects
+    *downloaded* copies (quarantine xattr); locally built dmgs never trigger it (observed).
 
 ## Open questions to resolve during/after build
 
