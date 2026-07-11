@@ -5,6 +5,37 @@ continue from a fresh Claude Code session (or by another person) even if `claude
 to carry the conversation after the repo/folder rename. Read this top-to-bottom to reconstruct full
 context.
 
+## Matt's (maintainer's) notes
+
+> Matt's scratchpad and notes for things observed outside an active coding session. If an item is addressed, click the checkbox, and/or add a ~~strikethrough~~ for emphasis.
+
+- [x] ~~Downloads spawn a blank white window  (presumably `about:blank`), but otherwise works.~~
+      *Fix v2 2026-07-11: v1 only hid `about:blank` popups → Matt's retest found group-chat
+      downloads still flashed (they open with a REAL fbcdn/fbsbx URL, then that navigation
+      becomes the download). Now EVERY allowed popup is created hidden and revealed only on its
+      first committed navigation, so both shapes download silently. Also added the browser-style
+      dock bounce on completion (`app.dock.downloadFinished`). **Verified fixed by Matt
+      2026-07-12.***
+- [x] ~~Calls made to the account/app do not steal window focus, it should.~~
+      *Attempts 1+2 (popup watchers) failed — Matt's screenshot (2026-07-12) proved the ring UI
+      is IN-PAGE (dialog in the main window; no popup until accepted), so no popup trigger can
+      fire. But the screenshot also showed the page title becomes "<name> is calling" during the
+      ring. Attempt 3 (current): the preload's existing title observer detects that
+      (`isIncomingCallTitle`, src/preload/incoming-call.ts), edge-triggered with a 5s re-arm so
+      a blinking title can't spam, and IPC `INCOMING_CALL` makes main show + `app.focus({steal:
+      true})`. Cross-checked 2026-07-12 via parallel web research (Sonnet + agy, agreeing):
+      "[Name] is calling(…/you)" is the known ring title; the pattern set mirrors
+      apotenza92/facebook-messenger-desktop's incoming-call-evidence.ts (the only wrapper found
+      doing this — Caprine resets the title and can't); localized variants + title blinking
+      remain unconfirmed (detector is en-only, blink-proof by design). **Verified working by
+      Matt 2026-07-12.***
+- [x] ~~Optional: In dark mode, about:blank is white, then the Messenger splash screen itself is white until the full app loads. If possible, there should be a splash screen that lives outside of `messenger.com` that follows the current OS light/dark mode~~
+      *Done 2026-07-11: native theme-aware splash window (`src/main/splash.ts`, data-URL HTML,
+      `prefers-color-scheme`) covers the load; the main window stays hidden until
+      `did-finish-load` (15s cap) and all windows get a `nativeTheme`-matched `backgroundColor`.
+      The preload also pins the page background dark in dark mode (best-effort — Messenger's own
+      white splash *artwork* can't be restyled from outside, only its backdrop).*
+
 ## Notes for Matt
 
 **State (end of 2026-07-11 session):** MVP done and merged to `main`. Calls ✅ (voice+video,

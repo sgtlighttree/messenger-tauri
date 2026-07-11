@@ -13,10 +13,10 @@ Electron (Chromium), not Tauri/WebKit, was chosen for exactly one reason: Messen
 calls depend on a Chrome-only WebRTC API (`createEncodedStreams`) that WebKit does not implement.
 See `docs/HANDOFF.md` for the full research trail behind that decision.
 
-**Calls-gate status: UNVERIFIED.** Camera/mic permission wiring, entitlements, and screen-share
-plumbing are implemented, but end-to-end calls have not been confirmed working in a real call.
-Don't claim calls work; check `docs/CALLS-RESULT.md` — it's PASSED/FAILED/PARTIAL only after a
-manual test pass fills it in.
+**Calls-gate status: PASSED (2026-07-11).** Voice + video calls verified bidirectionally in dev
+and packaged builds; screen share works (whole screen only). Evidence and root-cause trail in
+`docs/CALLS-RESULT.md`. Anything touching popups, permissions, or navigation guards risks this —
+the calls regression check in `docs/MANUAL-TESTS.md` §9 must be re-run after such changes.
 
 ## Common commands
 
@@ -41,6 +41,9 @@ true`, which needs a bundled, dependency-free script).
 
 ## Architecture map
 
+Process model, runtime data/storage locations (userData layout, what's regenerable), and
+footprint live in `ARCHITECTURE.md`; this map covers the source files.
+
 - **`src/main/config.ts`** — the single source of truth for the wrapped URL: `TARGET_URL`
   (`https://www.messenger.com`) and `ALLOWED_HOSTS` (hosts kept inside the app window: messenger.com,
   facebook.com, fbcdn.net, fbsbx.com — everything else is treated as external). To point the app
@@ -55,6 +58,9 @@ true`, which needs a bundled, dependency-free script).
   permission handler that grants only `media`/`display-capture` and denies everything else, and a
   `setDisplayMediaRequestHandler` for screen-share), and listens for the unread-count IPC message
   to set the dock badge (`app.setBadgeCount`).
+- **`src/main/splash.ts`** — a small frameless, theme-aware (`prefers-color-scheme`) splash
+  window built from an inline data-URL page (no static assets to package); shown while the main
+  window loads messenger.com hidden, then destroyed on reveal (`did-finish-load` / 15s cap).
 - **`src/preload/`** — the sandboxed, esbuild-bundled preload. `unread.ts` is a pure function
   (`parseUnreadCount`) that extracts the unread count from the page `<title>` (e.g. `"(3)
   Messenger"` → `3`); `index.ts` wires it up via a `MutationObserver` on `<title>` and sends it to
