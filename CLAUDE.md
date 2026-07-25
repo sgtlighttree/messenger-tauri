@@ -21,12 +21,12 @@ the calls regression check in `docs/MANUAL-TESTS.md` §9 must be re-run after su
 ## Common commands
 
 ```bash
-npm install                        # install JS deps
-npm start                          # npm run build && electron .  — launch the app locally
-npm test                           # vitest run — unit tests for the pure logic in src/
-CSC_NAME="Mercury Dev" npm run dist  # signed arm64 .dmg in release/ — CSC_NAME is REQUIRED
-                                   # (ad-hoc builds can't register notifications and reset
-                                   # TCC grants every rebuild; see docs/BUILD-NOTES.md)
+pnpm install                          # install JS deps
+pnpm start                            # pnpm run build && electron .  — launch the app locally
+pnpm test                             # vitest run — unit tests for the pure logic in src/
+CSC_NAME="Mercury Dev" pnpm run dist  # signed arm64 .dmg in release/ — CSC_NAME is REQUIRED
+                                      # (ad-hoc builds can't register notifications and reset
+                                       # TCC grants every rebuild; see docs/BUILD-NOTES.md)
 ```
 
 **Notifications are a known, evidence-backed limitation** — messenger.com posts them via Web
@@ -35,9 +35,11 @@ interception without reading the "Notifications" section of `docs/HANDOFF.md` fi
 existing preload shim + IPC bridge is the tested end state, and the owner chose badge+sound
 over synthetic banners.
 
-`npm run build` runs `tsc` (main + shared) and bundles the preload with esbuild into a single CJS
+`pnpm run build` runs `tsc` (main + shared) and bundles the preload with esbuild into a single CJS
 file at `dist/preload/index.js` (required because the preload runs under Electron's `sandbox:
 true`, which needs a bundled, dependency-free script).
+
+This project uses pnpm. Do not run `npm` or `yarn` here; `npm install` will regenerate a lockfile that conflicts with `pnpm-lock.yaml`.
 
 ## Architecture map
 
@@ -91,17 +93,22 @@ The page is remote, untrusted content (messenger.com), so the app is deliberatel
 
 ## Testing
 
-`npm test` runs `vitest` against `tests/links.test.ts` and `tests/unread.test.ts`, covering the
+`pnpm test` runs `vitest` against `tests/links.test.ts` and `tests/unread.test.ts`, covering the
 pure predicate/parsing logic in `src/main/links.ts` and `src/preload/unread.ts`. There is
 currently no automated test for Electron wiring itself (window creation, IPC, permission
 handlers) — that's exercised manually.
 
 ## Packaging
 
-`npm run dist` uses `electron-builder` (config in `package.json`'s `"build"` block) to produce an
+`pnpm run dist` uses `electron-builder` (config in `package.json`'s `"build"` block) to produce an
 arm64-only, `en`-locale-only `.dmg` in `release/` (note: `directories.output` is set to `release`,
 *not* `dist`, because `dist` is also the TypeScript/esbuild build output directory — electron-builder's
-`files` glob would otherwise recursively bundle its own previous output into the asar). There is no
-Apple Developer ID signing identity on the build machine; electron-builder ad-hoc-signs instead,
-so first launch requires right-click → Open to get past Gatekeeper. Real measured `.app`/`.dmg`
-sizes and RAM are recorded in `docs/BUILD-NOTES.md` — don't invent footprint numbers.
+`files` glob would otherwise recursively bundle its own previous output into the asar).
+
+Builds are signed with the self-signed "Mercury Dev" certificate in the login Keychain — hence
+`CSC_NAME="Mercury Dev"` on the `dist` command. This is not an Apple Developer ID and the app is
+not notarized, but a stable signing identity means macOS treats each rebuild as the same app:
+TCC grants (camera, microphone, notifications) persist across rebuilds instead of resetting, and
+launching an updated build needs no Gatekeeper right-click → Open. Building without `CSC_NAME`
+falls back to ad-hoc signing, which loses both properties — see `docs/BUILD-NOTES.md`. Real
+measured `.app`/`.dmg` sizes and RAM are recorded there too — don't invent footprint numbers.
