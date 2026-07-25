@@ -9,6 +9,9 @@ context.
 
 > Matt's scratchpad and notes for things observed outside an active coding session. If an item is addressed, click the checkbox, and/or add a ~~strikethrough~~ for emphasis.
 
+- [ ] Not all links open externally, links to Facebook posts actually spawn a new window,
+      triggering a sign in prompt instead of signing in with the current signed in account.
+- [ ] Icon for app inside `build/icon.png`, may need variants for macOS 26/Liquid Glass
 - [x] ~~Downloads spawn a blank white window  (presumably `about:blank`), but otherwise works.~~
       *Fix v2 2026-07-11: v1 only hid `about:blank` popups → Matt's retest found group-chat
       downloads still flashed (they open with a REAL fbcdn/fbsbx URL, then that navigation
