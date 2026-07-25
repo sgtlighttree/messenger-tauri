@@ -39,6 +39,11 @@ context.
       The preload also pins the page background dark in dark mode (best-effort — Messenger's own
       white splash *artwork* can't be restyled from outside, only its backdrop).*
 
+> **2026-07-25 — migrated npm → pnpm.** `pnpm-lock.yaml` is the lockfile;
+> `package-lock.json` is gone. Historical reports under `.superpowers/sdd/` and
+> `docs/superpowers/plans/` still say `npm` — those are archives, left as-written
+> on purpose. Do not "fix" them.
+
 ## Notes for Matt
 
 **State (end of 2026-07-11 session):** MVP done and merged to `main`. Calls ✅ (voice+video,
