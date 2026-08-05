@@ -81,11 +81,7 @@ context.
 - Notification-map keys now namespaced by sender id.
 - `app.isPackaged` guard for dev logging (NODE_ENV is unset in packaged builds).
 
-**Still to do after this session:** install the rebuilt `release/mac-arm64/Messenger.app` and
-run the calls regression check (`docs/MANUAL-TESTS.md` §9) — the session touched popups,
-permissions, and navigation guards adjacent code (nav guards unchanged, but the fuses/permission
-changes warrant the re-check). Then `CSC_NAME="Mercury Dev" pnpm run dist` for the final signed
-dmg.
+**Calls gate RE-VERIFIED on the hardened build — 2026-08-05.** Installed `release/Messenger-0.1.0-arm64.dmg` (signed Mercury Dev), voice+video calls confirmed working, screen share intact. The post-hardening regression check is done; no nav-guard/permission regressions. The single remaining `pnpm run dist` note above produced this dmg — nothing outstanding.
 
 **State (end of 2026-07-11 session):** MVP done and merged to `main`. Calls ✅ (voice+video,
 both directions, dev+packaged). Screen share ✅ (whole screen only). Badge ✅ (with anti-blink
