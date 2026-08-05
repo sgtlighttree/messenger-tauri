@@ -9,8 +9,23 @@ context.
 
 > Matt's scratchpad and notes for things observed outside an active coding session. If an item is addressed, click the checkbox, and/or add a ~~strikethrough~~ for emphasis.
 
-- [ ] Not all links open externally, links to Facebook posts actually spawn a new window,
-      triggering a sign in prompt instead of signing in with the current signed in account.
+- [ ] IMPORTANT: 2026 Jul 31: Call connected, but presumably because of a weird Bluetooth audio bug
+      in my headphones, I couldn't hear audio even as I disconnected my phone to eliminate a
+      multipoint connection issue. Otherwise works normally with onboard audio and headphones
+      on both sides. Playing audio from other sources/apps also bugged out and was silent
+      during the call using the headphone. Will need manual testing with more than onboard
+      audio hardware on this M1 Mac Air.
+- [x] ~~Not all links open externally, links to Facebook posts actually spawn a new window,
+      triggering a sign in prompt instead of signing in with the current signed in account.~~
+      *Fixed 2026-07-27: `facebook.com` has to stay in `ALLOWED_HOSTS` (login/2FA redirects
+      navigate the main window in place), so the fix is a new `POPUP_EXTERNAL_HOSTS` list —
+      allowlisted for in-place navigation, never allowed to open as an in-app popup. Diagnostic
+      logging showed the link arrives at `setWindowOpenHandler` already carrying a real URL, and
+      that the shape is `/share/r/<id>/` — a share-redirect, not `/posts/` — which is why this is
+      a host rule, not a path rule. Verified: the same link now returns `open-external` and no
+      popup is created; the call popup still takes the `about:blank` branch and navigates to
+      messenger.com, so the calls gate is untouched. Design + evidence:
+      `docs/superpowers/specs/2026-07-27-facebook-link-handling-design.md`.*
 - [ ] Icon for app inside `build/icon.png`, may need variants for macOS 26/Liquid Glass
 - [x] ~~Downloads spawn a blank white window  (presumably `about:blank`), but otherwise works.~~
       *Fix v2 2026-07-11: v1 only hid `about:blank` popups → Matt's retest found group-chat
@@ -43,25 +58,52 @@ context.
 > `package-lock.json` is gone. Historical reports under `.superpowers/sdd/` and
 > `docs/superpowers/plans/` still say `npm` — those are archives, left as-written
 > on purpose. Do not "fix" them.
+>
+> **2026-07-25 — the rename is DONE.** The repo is `mercury-mac` on GitHub
+> (`github.com/sgtlighttree/mercury-mac`) and locally at `~/mercury-mac`. The two rename
+> runbooks further down ("Notes for Matt" and "Rename runbook") are kept as a record of what
+> was run — they are **not** pending work. Same for the dated evidence sections (§Repo state
+> at handoff, §CALLS GATE PASSED): the `npm` commands in those describe what was actually
+> executed at the time and are deliberately left as-written.
 
 ## Notes for Matt
 
+**Security hardening session — COMPLETED 2026-08-05.** 8 commits on `main` (see `git log
+--oneline -8`). Details in `docs/BUILD-NOTES.md` § Security hardening:
+- Electron 43.1.0 → **43.3.0** (CVE-2026-54257 — Apple Silicon UTF-8 truncation; risky because
+  Messenger's in-page crypto uses TextEncoder on the M1).
+- **Fuses flipped off** in `scripts/after-pack.cjs`: `RunAsNode`, `NODE_OPTIONS`, and
+  `--inspect` are all inert in the packaged app (verified in the built binary, not just
+  configured).
+- **`NSAllowsArbitraryLoads=false`** — electron-builder hardcodes it to `true`; forced back
+  via the same afterPack hook because `extendInfo` can't override it.
+- `pnpm run build` now emits only the files main actually requires; dead dist files gone.
+- Notification-map keys now namespaced by sender id.
+- `app.isPackaged` guard for dev logging (NODE_ENV is unset in packaged builds).
+
+**Still to do after this session:** install the rebuilt `release/mac-arm64/Messenger.app` and
+run the calls regression check (`docs/MANUAL-TESTS.md` §9) — the session touched popups,
+permissions, and navigation guards adjacent code (nav guards unchanged, but the fuses/permission
+changes warrant the re-check). Then `CSC_NAME="Mercury Dev" pnpm run dist` for the final signed
+dmg.
+
 **State (end of 2026-07-11 session):** MVP done and merged to `main`. Calls ✅ (voice+video,
 both directions, dev+packaged). Screen share ✅ (whole screen only). Badge ✅ (with anti-blink
-stabilizer). Session/2FA ✅. Window size persists ✅ (shared between `npm start` and the
+stabilizer). Session/2FA ✅. Window size persists ✅ (shared between `pnpm start` and the
 packaged app). Notifications ❌ — documented limitation, see the Notifications section below;
 badge+sound is the chosen behavior.
 
 **Build the real app** (signed — required, or notifications registration and TCC persistence
 break, and hardened runtime won't load):
 ```bash
-CSC_NAME="Mercury Dev" npm run dist   # → release/Messenger-0.1.0-arm64.dmg
+CSC_NAME="Mercury Dev" pnpm run dist   # → release/Messenger-0.1.0-arm64.dmg
 ```
 The "Mercury Dev" self-signed cert lives in your login keychain (trusted for code signing).
-Plain `npm run dist` without CSC_NAME produces an ad-hoc build that LAUNCHES but can't register
+Plain `pnpm run dist` without CSC_NAME produces an ad-hoc build that LAUNCHES but can't register
 for notifications and resets TCC grants every rebuild — don't use it.
 
-**The rename (run when NO Claude session is active in this folder):**
+**The rename — COMPLETED 2026-07-25.** Kept for the record; nothing here is still to do. What
+was run:
 ```bash
 cd ~/messenger-tauri && gh repo rename mercury-mac --yes   # GitHub + remote + redirects
 cd ~ && mv messenger-tauri mercury-mac                     # local folder
@@ -69,8 +111,8 @@ mv ~/.claude/projects/-Users-matthewoyan-messenger-tauri \
    ~/.claude/projects/-Users-matthewoyan-mercury-mac       # Claude history + memory follow
 cd ~/mercury-mac && claude --resume                        # verify this conversation appears
 ```
-If `--resume` doesn't show the conversation, this HANDOFF.md + the auto-loaded memory files
-carry everything. Package/crate identity inside the repo is already `mercury-mac`.
+Package identity inside the repo was already `mercury-mac`, so no in-repo identity change was
+needed.
 
 **Where things live:** spec+plan `docs/superpowers/`; calls evidence `docs/CALLS-RESULT.md`;
 manual checklist `docs/MANUAL-TESTS.md`; build facts `docs/BUILD-NOTES.md`; follow-up list
@@ -109,6 +151,8 @@ login, native notifications + dock badge, sane links/downloads, and — the diff
 - **Plan:** `docs/superpowers/plans/2026-07-10-messenger-desktop-mvp.md`
 - **Branch:** `feat/rebuild-v1`
 - **Next action:** execute the plan (Task 1 onward). Rename is deferred to plan Task 12.
+  *(Historical — as written at kickoff. The plan was executed and the rename completed
+  2026-07-25.)*
 
 ## The one decision that drove everything: engine = Electron, not Tauri
 
@@ -193,12 +237,12 @@ market unverified ones.
 - All automated checks green (11/11 unit tests, build, packaging). Every login-dependent check is
   batched in `docs/MANUAL-TESTS.md` — **none run yet**, including the calls gate.
 - GitHub remote: `github.com/sgtlighttree/messenger-tauri` (rename to `mercury-mac` deferred to plan
-  Task 12; branch not yet pushed).
+  Task 12; branch not yet pushed). *— as of the handoff; the rename has since been done, see below.*
 
-## Rename runbook (deferred — plan Task 12, run at a session boundary)
+## Rename runbook — COMPLETED 2026-07-25 (was plan Task 12)
 
-New name chosen: **`mercury-mac`** (Mercury = messenger god + quicksilver/lightweight). Run only when
-no Claude session is active in the folder:
+Name chosen: **`mercury-mac`** (Mercury = messenger god + quicksilver/lightweight). Retained as a
+record of what was run — this is **not** outstanding work:
 
 ```bash
 cd ~/messenger-tauri && gh repo rename mercury-mac --yes      # updates remote + adds redirects
@@ -208,7 +252,7 @@ mv ~/.claude/projects/-Users-matthewoyan-messenger-tauri \
 cd ~/mercury-mac && claude --resume                           # verify this conversation follows
 ```
 
-If `--resume` doesn't show this conversation, this HANDOFF.md is the fallback context.
+The Claude history carried over successfully; this HANDOFF.md was the planned fallback context.
 
 ## 🎉 CALLS GATE: PASSED (2026-07-11)
 
@@ -231,7 +275,8 @@ All fail safe, are unreachable in practice, or are cosmetic. None block merge; g
 2. Tab/newline-in-scheme URLs dropped rather than opened — fails safe.
 3. `Infinity` would pass the badge-count guard — unreachable (only our preload sends, regex can't emit it).
 4. No debounce on the title MutationObserver — cheap idempotent IPC.
-5. CI pins Node 20 vs local Node 24 — bump when convenient.
+5. ~~CI pins Node 20 vs local Node 24 — bump when convenient.~~ **Done** — `ci.yml` pins Node 24
+   and installs via `pnpm install --frozen-lockfile`.
 6. esbuild `^0.24` pin is oldish — bump opportunistically.
 7. Downloads overwrite silently on duplicate filenames — add a counter suffix if path exists.
 8. `will-redirect` not intercepted (server-side 3xx to a non-allowlisted host would load in-window;
@@ -239,10 +284,12 @@ All fail safe, are unreachable in practice, or are cosmetic. None block merge; g
 9. **Screen share has no source picker** — shares the entire primary screen immediately (MVP
    choice). Chromium browsers offer tab/window/screen selection; Electron needs a small custom
    picker UI over `desktopCapturer.getSources({types:["screen","window"]})`. Best UX follow-up.
-10. Sign builds with the "Mercury Dev" self-signed cert (`CSC_NAME="Mercury Dev" npm run dist`)
-    so the signature — and TCC permission grants — stay stable across rebuilds.
-11. README's "right-click → Open" note is slightly misleading: Gatekeeper only affects
-    *downloaded* copies (quarantine xattr); locally built dmgs never trigger it (observed).
+10. ~~Sign builds with the "Mercury Dev" self-signed cert so the signature — and TCC permission
+    grants — stay stable across rebuilds.~~ **Done and now mandatory** —
+    `CSC_NAME="Mercury Dev" pnpm run dist` is the only supported build path (`docs/BUILD-NOTES.md`).
+11. ~~README's "right-click → Open" note is slightly misleading~~ — the note now lives in
+    `docs/MANUAL-TESTS.md` §0 and has been corrected there: Gatekeeper only affects *downloaded*
+    copies (quarantine xattr); locally built, Mercury Dev-signed dmgs never trigger it (observed).
 
 ## Open questions to resolve during/after build
 
