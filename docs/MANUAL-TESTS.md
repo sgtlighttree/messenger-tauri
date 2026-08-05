@@ -2,13 +2,16 @@
 
 Every check below needs a real Facebook login, so agents couldn't run them — they were
 deliberately batched here (owner's decision during execution). Run top-to-bottom; each item
-says where to record the result. App-under-test: `npm start` for dev checks, or install
+says where to record the result. App-under-test: `pnpm start` for dev checks, or install
 `release/Messenger-0.1.0-arm64.dmg` for the packaged checks.
 
 ## 0. Install & first launch (packaged build)
 
-- [x] Open the dmg, drag Messenger.app to /Applications, launch via **right-click → Open**
-      (ad-hoc signed; Gatekeeper blocks plain double-click on first run).
+- [x] Open the dmg, drag Messenger.app to /Applications, launch it.
+      *(Originally run against an ad-hoc build via right-click → Open. Builds are now signed with
+      the "Mercury Dev" cert, and a locally built dmg carries no quarantine xattr — so plain
+      double-click works and no Gatekeeper prompt appears. The right-click → Open dance only
+      applies to a copy that was **downloaded**. See `docs/BUILD-NOTES.md`.)*
 - [x] App opens and shows the messenger.com login page.
 
 ## 1. Security spot-check (dev or packaged)
@@ -68,10 +71,11 @@ Fill **docs/CALLS-RESULT.md** as you go; it is the spec's M3 evidence file.
 
 - [x] `git push -u origin feat/rebuild-v1` → confirm the GitHub Actions CI run goes green
       (first live validation of `.github/workflows/ci.yml`).
-- [ ] When ready (at a session boundary, no active Claude session in this folder): run the
-      **rename runbook** — plan Task 12 in
-      `docs/superpowers/plans/2026-07-10-messenger-desktop-mvp.md` (repo → `mercury-mac`,
-      folder move, Claude history carry, `claude --resume` verification).
+- [x] **Rename runbook** (was plan Task 12) — **done 2026-07-25**: repo renamed to `mercury-mac`
+      on GitHub, local folder moved to `~/mercury-mac`, Claude history carried over. Nothing left
+      to run; the runbook is retained as a record in `docs/HANDOFF.md`.
+- [x] **npm → pnpm migration** — done 2026-07-25: `pnpm-lock.yaml` is the lockfile, CI installs
+      with `pnpm install --frozen-lockfile`.
 
 ## 9. 2026-07-11 follow-up fixes (Matt's HANDOFF notes)
 

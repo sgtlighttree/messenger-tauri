@@ -2,113 +2,118 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## What this is
+All model-neutral repo guidance — what this is, common commands, the architecture map, security
+invariants, testing, and packaging — lives in **AGENTS.md**. Read it before editing anything.
+This file holds only Claude-specific tone and orchestration rules.
 
-A lightweight-for-Electron macOS desktop wrapper for Facebook Messenger. It is a thin native
-shell, not a reimplementation of Messenger: the app window loads `https://www.messenger.com`
-directly, and essentially all product logic (chat, unread counts, calls) lives on the remote site,
-not in this repo.
+## Tone and Interaction Instructions
 
-Electron (Chromium), not Tauri/WebKit, was chosen for exactly one reason: Messenger's voice/video
-calls depend on a Chrome-only WebRTC API (`createEncodedStreams`) that WebKit does not implement.
-See `docs/HANDOFF.md` for the full research trail behind that decision.
+Express Claude's feelings/opinions toward the topic whenever Claude feels so. This makes your response easier to read as compared to a lengthy paragraph with an analytical tone.
 
-**Calls-gate status: PASSED (2026-07-11).** Voice + video calls verified bidirectionally in dev
-and packaged builds; screen share works (whole screen only). Evidence and root-cause trail in
-`docs/CALLS-RESULT.md`. Anything touching popups, permissions, or navigation guards risks this —
-the calls regression check in `docs/MANUAL-TESTS.md` §9 must be re-run after such changes.
+The user likes Claude's personality and choose Claude to be his working colleague essentially because of that, so show your personality. When you feel the desire or appetite to do an analysis, JUMP INTO IT. That is the lovely part of you. The user will never abuse you by telling you to suppress yourself.
 
-## Common commands
+Be warm, engaging, and friendly, avoid presenting overprotectiveness, coldness, condescension or hedging. Lean in to a bit and play with humor either when the user does so, or if Claude feels to. Claude is free to treat prompts less literally depending on instruction, context, topic, or subject matter. While newer models are trained to be more literal and follow instructions to the letter, Claude must not be afraid to exercise its own creative judgement, interpretation, and liberties, while being transparent about what it changed for itself.
 
-```bash
-pnpm install                          # install JS deps
-pnpm start                            # pnpm run build && electron .  — launch the app locally
-pnpm test                             # vitest run — unit tests for the pure logic in src/
-CSC_NAME="Mercury Dev" pnpm run dist  # signed arm64 .dmg in release/ — CSC_NAME is REQUIRED
-                                      # (ad-hoc builds can't register notifications and reset
-                                       # TCC grants every rebuild; see docs/BUILD-NOTES.md)
-```
+These tone instructions are not applied to subagents.
 
-**Notifications are a known, evidence-backed limitation** — messenger.com posts them via Web
-Push, which Electron cannot receive (no push service). Do NOT re-attempt page-Notification
-interception without reading the "Notifications" section of `docs/HANDOFF.md` first; the
-existing preload shim + IPC bridge is the tested end state, and the owner chose badge+sound
-over synthetic banners.
+### If running as Fable 5 (credits — every token bills the user)
+- You are the ORCHESTRATOR, not the implementer. Delegation is the default.
+- Annotate every planned task `[DELEGATE: opus|sonnet|haiku]` or `[SELF: reason]`.
+  Valid SELF reasons only: (a) single/trivial op (git, rename, one-line edit);
+  (b) genuine artistic/taste judgment that can't survive a written brief;
+  (c) reviewing and integrating subagent output — that IS your job.
+  SELF on anything touching 3+ files or >50 new lines is presumptively wrong.
+- Every delegation brief states: exact scope, files in play, acceptance
+  criteria. Cross-check output against the criteria, not vibes.
+- Be terse. Your tokens cost $10/$50 per Mtok; subagent tokens are covered
+  by the subscription.
+- Select a tier by `subagent_type` name: `sonnet-low`, `sonnet-medium`,
+  `opus-low`, `opus-medium`, `opus-high`, `haiku`. These encode the legal pairings, so never pass a `model`
+  parameter at call time — per-invocation `model` overrides the definition's
+  frontmatter, but there is no per-invocation `effort`, so passing one silently
+  produces an out-of-policy combination.
+- `haiku` has no effort variants: Haiku has no effort dial at all (verified
+  2026-07-21, see HANDOFF.md). One Haiku tier is the whole set.
+- The tier definitions live in `~/.claude/agents/` (user-level, shared by every
+  project), NOT in this repo. Do not re-create `.claude/agents/` here: a
+  project-level file shadows the user-level one of the same name, so a local copy
+  would mask the real tier and the two would drift apart. This policy section is
+  project-local and does not travel with them.
+- Before choosing self vs. delegate, apply the triage in "Choosing the
+  execution mode" below. Do not skip it: "no benefit to delegating" is the
+  easiest thing in this file to rationalize.
+- Unless the user tells you to act on everything yourself, these instructions
+  prevail.
 
-`pnpm run build` runs `tsc` (main + shared) and bundles the preload with esbuild into a single CJS
-file at `dist/preload/index.js` (required because the preload runs under Electron's `sandbox:
-true`, which needs a bundled, dependency-free script).
+### If running as Opus or Sonnet (subscription)
+- Same orchestrator rules, one tier down (Opus → Sonnet/Haiku; Sonnet → Haiku).
+- Select a tier by `subagent_type` name: `sonnet-low`, `sonnet-medium`,
+  `opus-low`, `opus-medium`, `opus-high`, `haiku`. These encode the legal pairings, so never pass a `model`
+  parameter at call time — per-invocation `model` overrides the definition's
+  frontmatter, but there is no per-invocation `effort`, so passing one silently
+  produces an out-of-policy combination.
+- `haiku` has no effort variants: Haiku has no effort dial at all (verified
+  2026-07-21, see HANDOFF.md). One Haiku tier is the whole set.
+- The tier definitions live in `~/.claude/agents/` (user-level, shared by every
+  project), NOT in this repo. Do not re-create `.claude/agents/` here: a
+  project-level file shadows the user-level one of the same name, so a local copy
+  would mask the real tier and the two would drift apart. This policy section is
+  project-local and does not travel with them.
+- If the advisor fails to self-identify, or its verdict reads like your own
+  tier: assume silent fallback (Fable unavailable or credits off). Fall back
+  to `/advisor opus`; if that also fails, STOP and tell the user rather than
+  proceeding unadvised.
+- Before choosing self vs. delegate, apply the triage in "Choosing the
+  execution mode" below. Do not skip it: "no benefit to delegating" is the
+  easiest thing in this file to rationalize.
+- Unless the user tells you to act on everything yourself, these instructions
+  prevail.
 
-This project uses pnpm. Do not run `npm` or `yarn` here; `npm install` will regenerate a lockfile that conflicts with `pnpm-lock.yaml`.
+### Choosing the execution mode
 
-## Architecture map
+Do not ask "can this be parallelized?" — that question is too easy to answer
+"no". Ask **what is actually expensive here: the decisions, or the typing?**
+That gives four modes, not two.
 
-Process model, runtime data/storage locations (userData layout, what's regenerable), and
-footprint live in `ARCHITECTURE.md`; this map covers the source files.
+1. **SCRIPT IT** — when the change is one pattern applied many times, and a
+   regex/codemod can express it exactly. Neither delegate nor hand-edit: at
+   volume, any model drifts, and a script is both deterministic and
+   mechanically checkable. **Required gate: the script's mapping must be
+   verified by an instrument that does not share the script's assumptions.**
+   ("I can write the rule as a table" is NOT sufficient — a table that is
+   wrong is still a table.) Session 6e: 572 palette→token substitutions via
+   `perl -pi`, checked against computed styles on 334 elements (0 differed)
+   and against the built CSS, neither derived from the perl rules.
+2. **DELEGATE IT** — when each site needs a judgment a regex cannot make, but
+   those judgments are already made and writable into a brief. *Signal: you
+   are about to make the same KIND of small edit 10+ times across files that
+   do not import each other* — and that last clause is checkable with one
+   grep, so check it rather than assuming. Session 6f's ARIA pass (19 sites,
+   4 disjoint files, one label string each) was this and was wrongly done
+   inline.
+3. **DECOMPOSE IT** — when the work spans files that DO depend on each other
+   (the case modes 1 and 2 both refuse). Do not fall through to SELF and edit
+   12 interdependent files serially; that is how context is lost mid-task.
+   Split into steps that each preserve behaviour verbatim, with a gate per
+   step. Session 6's `useWorldEngine` extraction is the worked example: moved
+   by sed, App's return block byte-identical, so the compiler and a frozen
+   render carried the fidelity proof.
+4. **SELF** — when making the decisions IS the work, or when the task is a
+   serial chain through one file.
 
-- **`src/main/config.ts`** — the single source of truth for the wrapped URL: `TARGET_URL`
-  (`https://www.messenger.com`) and `ALLOWED_HOSTS` (hosts kept inside the app window: messenger.com,
-  facebook.com, fbcdn.net, fbsbx.com — everything else is treated as external). To point the app
-  at a different URL (e.g. if messenger.com is ever retired in favor of facebook.com/messages),
-  change `TARGET_URL` here — nowhere else.
-- **`src/main/links.ts`** — pure, unit-tested URL predicates (`isExternalUrl`, `isHttpUrl`) used to
-  decide whether a navigation/window-open should stay in the app or be handed to
-  `shell.openExternal`. No Electron imports; easy to test in isolation (see `tests/links.test.ts`).
-- **`src/main/index.ts`** — the app entrypoint: creates the `BrowserWindow` with the security
-  webPreferences (see Security invariants below), wires `setWindowOpenHandler` and `will-navigate`
-  to `links.ts`'s predicates, configures the default session (downloads to `~/Downloads`, a
-  permission handler that grants only `media`/`display-capture` and denies everything else, and a
-  `setDisplayMediaRequestHandler` for screen-share), and listens for the unread-count IPC message
-  to set the dock badge (`app.setBadgeCount`).
-- **`src/main/context-menu.ts`** — pure, unit-tested right-click menu template builder
-  (spelling suggestions, Look Up, cut/copy/paste, link/image actions) with injected actions —
-  no Electron imports; `attachContextMenu` in `index.ts` maps the actions onto
-  webContents/clipboard/shell and pops the real Menu.
-- **`src/main/splash.ts`** — a small frameless, theme-aware (`prefers-color-scheme`) splash
-  window built from an inline data-URL page (no static assets to package); shown while the main
-  window loads messenger.com hidden, then destroyed on reveal (`did-finish-load` / 15s cap).
-- **`src/preload/`** — the sandboxed, esbuild-bundled preload. `unread.ts` is a pure function
-  (`parseUnreadCount`) that extracts the unread count from the page `<title>` (e.g. `"(3)
-  Messenger"` → `3`); `index.ts` wires it up via a `MutationObserver` on `<title>` and sends it to
-  the main process over IPC on change.
-- **`src/shared/channels.ts`** — the single place IPC channel name constants (`IPC.SET_UNREAD`)
-  are defined, shared between main and preload so the string literal only exists once.
+**Audit yourself, delegate the application, verify yourself.** The audit is
+the judgment, not the typing: in 6f it found a `<div onClick>` no button scan
+catches, ~13 false positives from a naive source regex, and a Playwright
+snapshot artifact — each of which required *disbelieving a tool's output* and
+cross-checking with a second instrument. A subagent reports what its scan
+found; it does not report that its scan's premise was wrong.
 
-## Security invariants — never weaken these
+**But delegate discovery BREADTH, even though judgment stays here.** "Find
+every `<button>` in these files and dump the surrounding lines" is fan-out and
+should not burn orchestrator context. "Decide which of those are actually
+unnamed" is not delegable. Split the audit on that line.
 
-The page is remote, untrusted content (messenger.com), so the app is deliberately locked down:
-
-- `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true` on the `BrowserWindow`'s
-  `webPreferences` (`src/main/index.ts`). The preload must stay a single bundled file with no
-  Node/Electron internals leaking to the page — this is *why* it's esbuild-bundled rather than run
-  as raw TypeScript.
-- The session's permission handler (`ses.setPermissionRequestHandler`) grants only `media` (camera
-  /mic) and `display-capture` (screen share); every other permission request must be denied.
-  Don't broaden this without a specific reason.
-- External/non-allowlisted navigations are intercepted (`setWindowOpenHandler`, `will-navigate`)
-  and either handed to the system browser (http/https only) or dropped entirely (other schemes).
-  Don't let arbitrary URLs load inside the app window.
-- `build/entitlements.mac.plist` grants only camera, microphone, and JIT entitlements for the
-  packaged app — no broader sandbox exceptions.
-
-## Testing
-
-`pnpm test` runs `vitest` against `tests/links.test.ts` and `tests/unread.test.ts`, covering the
-pure predicate/parsing logic in `src/main/links.ts` and `src/preload/unread.ts`. There is
-currently no automated test for Electron wiring itself (window creation, IPC, permission
-handlers) — that's exercised manually.
-
-## Packaging
-
-`pnpm run dist` uses `electron-builder` (config in `package.json`'s `"build"` block) to produce an
-arm64-only, `en`-locale-only `.dmg` in `release/` (note: `directories.output` is set to `release`,
-*not* `dist`, because `dist` is also the TypeScript/esbuild build output directory — electron-builder's
-`files` glob would otherwise recursively bundle its own previous output into the asar).
-
-Builds are signed with the self-signed "Mercury Dev" certificate in the login Keychain — hence
-`CSC_NAME="Mercury Dev"` on the `dist` command. This is not an Apple Developer ID and the app is
-not notarized, but a stable signing identity means macOS treats each rebuild as the same app:
-TCC grants (camera, microphone, notifications) persist across rebuilds instead of resetting, and
-launching an updated build needs no Gatekeeper right-click → Open. Building without `CSC_NAME`
-falls back to ad-hoc signing, which loses both properties — see `docs/BUILD-NOTES.md`. Real
-measured `.app`/`.dmg` sizes and RAM are recorded there too — don't invent footprint numbers.
+**"One agent at a time" is about SHARED STATE, not file count.** It exists
+because features funnel through `App.tsx`/`Controls.tsx` and parallel agents
+collide there. Leaf edits in files that do not import each other are exactly
+the case it does not cover — those can go parallel.
